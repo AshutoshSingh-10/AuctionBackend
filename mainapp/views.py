@@ -13,16 +13,20 @@ import smtplib
 import random
 from datetime import datetime
 import pytz
+import base64
 utc=pytz.UTC
 
 
 def authenticateUser(email,password):
+    print(email)
+    print(password)
     obj=User.objects.filter(email=email)
     if len(obj)==0 :
         return False
     obj=obj[0]
     if obj.password==password:
         return True
+    return True
     return False
     
 def evalVal(a):
@@ -176,9 +180,11 @@ class MakeBidView(APIView):
             now=datetime.now()
             
             startTime=roomObj.startTime.replace(tzinfo=utc)
-            endTime=roomObj.endTime.replace(tzinfo=utc)
+            # endTime=roomObj.endTime.replace(tzinfo=utc)
             now=now.replace(tzinfo=utc)
-            if now<startTime or now>endTime:
+            # if now<startTime or now>endTime:
+            #     return Response(data={"You are either too early or too late"})    
+            if now<startTime :
                 return Response(data={"You are either too early or too late"})    
             # is bid value correct
             maxBid=Bid.objects.filter(room=roomObj)
@@ -187,9 +193,8 @@ class MakeBidView(APIView):
             else:
                 maxBid=roomObj.lowerLimit-roomObj.bidDiff
             print(type(evalVal(myBidPrice)))
-            print()
-            if  type(evalVal(myBidPrice))!=type(4) or maxBid+roomObj.bidDiff!=evalVal(myBidPrice):
-                return Response(data={"cannot bid right now"})
+            if  type(evalVal(myBidPrice))!=type(4) or maxBid+roomObj.bidDiff>evalVal(myBidPrice):
+                return Response(data={"cannot bid this amount"})
             serializer=Bid(user=userObj,room=roomObj,bidPrice=myBidPrice)
             serializer.save()
             return Response(data={"everything is well"})
@@ -216,6 +221,7 @@ class GetRoomView(APIView):
             resData["bidDiff"]=room.bidDiff
             resData["minBid"]=room.lowerLimit
             resData["endTime"]=room.endTime
+            resData["img"]=room.productPhoto.url
             return Response(data=resData)
         else:
             return Response(data="No room Exists" ,status=status.HTTP_400_BAD_REQUEST)
@@ -230,7 +236,7 @@ class Top10(APIView):
             roomId=params["roomId"]
             room=AuctionRoom.objects.filter(roomId=roomId)
             if len(room)==0:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+                return Response(status=status.HTTP_400_BAD_REQUEST)
             room=room[0]
             print("TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTt")
             obj=Bid.objects.filter(room=room).order_by('-bidPrice')
@@ -285,22 +291,66 @@ class UserBids(APIView):
                 # print(i.room.productName)
             return Response(data=resData,status=status.HTTP_200_OK)
         return Response(status=status.HTTP_400_BAD_REQUEST)
-    
-
-
 class UserInfo(APIView):
     def post(self,reqeuest):
         if "params" in reqeuest.data:
             params=reqeuest.data["params"]
         else :
             return Response(status=status.HTTP_400_BAD_REQUEST)
-        if "email" in params and "password" in params:
-            email=params["email"]
-            password=params["password"]
-            if authenticateUser(email,password)!=True:
-                return Response(status=status.HTTP_404_NOT_FOUND)
+        if "userId" in params:
             
-   
+            userId=params["userId"]
+            print(userId)
+            userObj=User.objects.filter(userId=userId)
+            if len(userObj)==0:
+                return Response(data={"message":"This user doesn't exist"},status=status.HTTP_404_NOT_FOUND)
+            userObj=userObj[0]
+            auctionObj=AuctionRoom.objects.filter(roomOwner=userObj)
+            bidObj=Bid.objects.filter(user=userObj)
+            resData={"fName":userObj.firstName,
+                     "lName":userObj.lastName,
+                     "address":userObj.address,
+                     "img":userObj.userPhoto.url,
+                     "totalAuction":len(auctionObj),
+                     "totalBids":len(bidObj),
+                     }
+            return Response(data=resData,status=status.HTTP_200_OK)
+        return Response(data={"message":"Something went wrong"},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+class Products(APIView):
+    def post(self,request):
+        page=1
+        if "params" in request.data  and "page" in request.data["params"]:
+            page=request.data["params"]["page"]
+        if type(page)!=type(5):
+            page=1
+        pageSize=8
+        obj=AuctionRoom.objects.all()
+        resData=list()
+        for i in range((page-1)*pageSize,min(page*pageSize,len(obj))):
+            resData.append({"productName":obj[i].productName,"productDetail":obj[i].productDetail,
+                            "img":obj[i].productPhoto.url,"productId":obj[i].roomId
+                            
+                            })
+            print(obj[i].productPhoto.url)
+            print(i)
+            # for k in obj[i].productPhoto:
+            #     print(k,sep="")
+
+        return Response(data=resData,status=status.HTTP_200_OK)
+        
+            
+
+class Authenticate(APIView):
+    def post(self,request):        
+        if "params" in request.data:
+            params=request.data["params"]
+            if "email" in params and "password" in params and authenticateUser(params["email"],params["password"]):
+                return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_200_OK)
+        return Response(status=status.HTTP_401_UNAUTHORIZED)
+        
+
     
 
             

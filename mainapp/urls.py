@@ -11,5 +11,8 @@ urlpatterns = [
    path('top10',views.Top10.as_view()),
    path('userrooms',views.UserRooms.as_view()),
    path('userbids',views.UserBids.as_view()),
+   path('userinfo',views.UserInfo.as_view()),
+   path('products',views.Products.as_view()),
+   path('authenticate',views.Authenticate.as_view()),
 #    path('is_user_available',views.IsUsernameAvailableView.as_view())
 ]
